@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explore MP4 and MOV files, understand their boxes, and trace metadata back to the bytes.">
+  <title>Media Byte Crawler — look inside your media</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Media Byte Crawler home"><span class="brand-icon">⌘</span><span>media byte <strong>crawler</strong><small>A LITTLE CURIOSITY. EVERY BYTE.</small></span></a>
+    <div class="header-right"><span class="local-tag"><i></i> Runs locally. Files stay yours.</span><button class="button" id="learn-button">Field guide <span>↗</span></button></div>
+  </header>
+  <main>
+    <section class="intro"><div><div class="eyebrow">THE MEDIA FILE EXPLORER</div><h1>There’s a story in every byte.</h1><p>Open a file. Follow its structure. Understand what makes it play.</p></div><div class="format-tags"><span>MP4</span><span>MOV</span><small>More formats, one byte at a time.</small></div></section>
+    <section class="file-bar" id="drop-zone" aria-label="Open a media file">
+      <div class="file-symbol">↥</div><div class="file-description"><strong id="file-name">Drop a media file here</strong><span id="file-subtitle">MP4 or MOV · parsed on your device</span></div>
+      <div class="file-actions"><button class="text-button" id="sample-button">Try the sample</button><button class="button primary" id="open-file">Open file <span>＋</span></button><input id="file-input" type="file" accept=".mp4,.mov,.m4v,.m4a,.qt,video/mp4,video/quicktime" hidden></div>
+    </section>
+    <div id="status" role="status" aria-live="polite"></div>
+    <section class="metrics" id="metrics" aria-label="File overview"></section>
+    <div class="workspace-header"><div class="tabs" role="tablist" aria-label="Explorer views"><button role="tab" aria-selected="true" aria-controls="inspect-view" id="tab-inspect" data-tab="inspect">Structure <span>01</span></button><button role="tab" aria-selected="false" aria-controls="tracks-view" id="tab-tracks" data-tab="tracks">Tracks <span>02</span></button><button role="tab" aria-selected="false" aria-controls="learn-view" id="tab-learn" data-tab="learn">Learn the format <span>03</span></button></div><button class="text-button" id="export-button" disabled>Export JSON ↓</button></div>
+    <section id="inspect-view" role="tabpanel" aria-labelledby="tab-inspect">
+      <div class="file-map-panel"><div class="section-label">FILE MAP <span>On-disk order · widths proportional to bytes</span></div><div id="file-map" class="file-map"></div><div id="map-legend" class="map-legend"></div></div>
+      <div class="explorer-grid">
+        <aside class="tree-panel"><div class="panel-title"><h2>Box hierarchy</h2><button id="expand-button" class="text-button" title="Expand or collapse all boxes">Collapse all</button></div><label class="search"><span>⌕</span><input type="search" id="box-search" placeholder="Find a box or field…" aria-label="Search box types and descriptions"></label><div class="tree-hint">TYPE <span>SIZE</span></div><div id="box-tree" class="box-tree" aria-label="File box hierarchy"></div><div class="tree-footer"><span class="dot container"></span> Container <span class="dot media"></span> Media <span class="dot timing"></span> Metadata</div></aside>
+        <article class="detail-panel" id="box-detail"><div class="empty-state"><span>↖</span><h2>A file is more than its extension.</h2><p>Open your own file or try the sample to explore its boxes, fields, and bytes.</p><button class="button primary" id="empty-sample">Explore the sample →</button></div></article>
+        <aside class="guide-panel" id="context-guide"></aside>
+      </div>
+      <section class="hex-panel" aria-label="Byte inspector"><div class="hex-toolbar"><div><div class="eyebrow">UNDER THE HOOD</div><h2>Byte inspector <span id="hex-range"></span></h2></div><form id="jump-form"><label for="jump-offset">Go to byte</label><input id="jump-offset" placeholder="0 or 0x00" autocomplete="off" spellcheck="false"><button class="button" type="submit">Go →</button></form></div><div id="hex-message" role="status"></div><div class="hex-layout"><div class="hex-scroll"><div id="hex-grid" class="hex-grid"></div></div><aside id="byte-detail" class="byte-detail"><span class="eyebrow">FOLLOW THE BYTES</span><p>Select a field above to highlight its bytes, or click a byte to decode its value.</p></aside></div><div class="hex-footer"><div><span class="swatch header"></span> Box header <span class="swatch selected"></span> Selected field <span class="hex-tip">Click a byte to inspect it</span></div><div><button id="hex-prev" class="button" disabled>← Previous</button><button id="hex-next" class="button" disabled>Next →</button></div></div></section>
+    </section>
+    <section id="tracks-view" role="tabpanel" aria-labelledby="tab-tracks" hidden></section>
+    <section id="learn-view" role="tabpanel" aria-labelledby="tab-learn" hidden></section>
+    <section id="warnings" class="warnings" hidden></section>
+    <footer><span>Built for the curious. Follow the bytes.</span><span>MP4 & MOV exploration · <a href="https://developer.apple.com/documentation/quicktime-file-format" target="_blank" rel="noreferrer">QuickTime reference ↗</a></span></footer>
+  </main>
+</body>
+</html>

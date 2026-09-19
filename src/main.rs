@@ -5,10 +5,15 @@ use std::{
     io::{Read, Seek, SeekFrom},
 };
 
+mod ui;
+
 fn main() -> Result<()> {
     let path = env::args()
         .nth(1)
         .unwrap_or_else(|| "sample/vid_s_01.mp4".to_owned());
+    if path == "--ui" {
+        return ui::serve();
+    }
     let mut file = File::open(&path).with_context(|| format!("could not open {path}"))?;
     let file_size = file.metadata()?.len();
 
