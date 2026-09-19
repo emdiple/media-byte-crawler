@@ -39,8 +39,8 @@ fn header_extractor(offset: u64, end: u64, file: &mut File) -> Result<HeaderData
     file.read_exact(&mut header)?;
 
     let size_32 = u32::from_be_bytes(header[0..4].try_into()?);
-    let box_type = header[4..8].try_into()?;
-    let (mut size, header_size) = if size_32 == 1 {
+    let box_type: [u8; 4] = header[4..8].try_into()?;
+    let (mut size, mut header_size) = if size_32 == 1 {
         ensure!(
             end.saturating_sub(offset) >= 16,
             "truncated extended box header at offset {offset}"
@@ -52,8 +52,11 @@ fn header_extractor(offset: u64, end: u64, file: &mut File) -> Result<HeaderData
         (u64::from(size_32), 8)
     };
 
-    if size == 0 {
-        size = end - offset;
+    if size_32 == 0 {
+        size = file.metadata()?.len() - offset;
+    }
+    if &box_type == b"uuid" {
+        header_size += 16;
     }
 
     ensure!(
@@ -95,6 +98,10 @@ fn is_container(box_type: &[u8; 4]) -> bool {
 
 fn read_payload(file: &mut File, offset: u64, size: u64, header_size: u64) -> Result<Vec<u8>> {
     let payload_size = size - header_size;
+    ensure!(
+        payload_size <= 1024 * 1024,
+        "metadata payload exceeds the CLI's 1 MiB limit; use --ui to inspect it in byte ranges"
+    );
     let length: usize = payload_size
         .try_into()
         .context("box payload is too large to fit in memory")?;
@@ -196,6 +203,7 @@ fn read_duration(payload: &[u8], offset: usize, size: usize) -> Result<u64> {
 }
 
 fn parse_boxes(file: &mut File, start: u64, end: u64, depth: usize) -> Result<()> {
+    ensure!(depth <= 48, "box nesting exceeds 48 levels");
     let mut offset = start;
 
     while offset < end {
@@ -213,6 +221,9 @@ fn parse_boxes(file: &mut File, start: u64, end: u64, depth: usize) -> Result<()
             b"mvhd" => parse_mvhd(file, offset, &header)?,
             b"tkhd" => parse_tkhd(file, offset, &header)?,
             b"mdhd" => parse_mdhd(file, offset, &header)?,
+            b"hdlr" | b"stsz" | b"stco" | b"co64" => {
+                parse_index_summary(file, offset, &header, depth + 1)?;
+            }
             b"mdat" => {}
             box_type if is_container(box_type) => parse_boxes(
                 file,
@@ -226,6 +237,58 @@ fn parse_boxes(file: &mut File, start: u64, end: u64, depth: usize) -> Result<()
         offset += header.size;
     }
 
+    Ok(())
+}
+
+fn parse_index_summary(
+    file: &mut File,
+    offset: u64,
+    header: &HeaderData,
+    depth: usize,
+) -> Result<()> {
+    // A short prefix is enough to explain a table without allocating its full payload.
+    let payload_size = (header.size - header.header_size).min(76) as usize;
+    let mut payload = vec![0; payload_size];
+    file.seek(SeekFrom::Start(offset + header.header_size))?;
+    file.read_exact(&mut payload)?;
+    let indent = "  ".repeat(depth);
+    match &header.box_type {
+        b"hdlr" => {
+            ensure!(payload.len() >= 12, "hdlr box is too short");
+            println!(
+                "{indent}handler={} (vide=video, soun=audio)",
+                fourcc(&payload[8..12])
+            );
+        }
+        b"stsz" => {
+            ensure!(payload.len() >= 12, "stsz box is too short");
+            let size = u32::from_be_bytes(payload[4..8].try_into()?);
+            let count = u32::from_be_bytes(payload[8..12].try_into()?);
+            if size == 0 {
+                ensure!(
+                    u64::from(count) * 4 + 12 <= header.size - header.header_size,
+                    "truncated sample size table"
+                );
+            }
+            println!("{indent}sample_count={count} fixed_sample_size={size} (0=per-sample table)");
+        }
+        b"stco" | b"co64" => {
+            ensure!(payload.len() >= 8, "chunk offset box is too short");
+            let count = u32::from_be_bytes(payload[4..8].try_into()?);
+            let width = if &header.box_type == b"co64" { 8 } else { 4 };
+            ensure!(
+                u64::from(count) * width + 8 <= header.size - header.header_size,
+                "truncated chunk offset table"
+            );
+            println!("{indent}chunk_count={count} (absolute byte offsets; showing up to 8)");
+            for index in 0..count.min(8) as usize {
+                let start = 8 + index * width as usize;
+                let chunk_offset = read_duration(&payload, start, width as usize)?;
+                println!("{indent}chunk {} -> byte {chunk_offset}", index + 1);
+            }
+        }
+        _ => unreachable!(),
+    }
     Ok(())
 }
 
@@ -268,6 +331,20 @@ mod tests {
     fn rejects_boxes_past_parent_boundary() -> Result<()> {
         let invalid = [0, 0, 0, 16, b'f', b'r', b'e', b'e'];
         with_file(&invalid, |file| {
+            assert!(header_extractor(0, 8, file).is_err());
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn rejects_zero_extended_size_and_nested_eof_box() -> Result<()> {
+        let invalid = [0, 0, 0, 1, b'f', b'r', b'e', b'e', 0, 0, 0, 0, 0, 0, 0, 0];
+        with_file(&invalid, |file| {
+            assert!(header_extractor(0, 16, file).is_err());
+            Ok(())
+        })?;
+        let nested = [0, 0, 0, 0, b'f', b'r', b'e', b'e', 0, 0, 0, 0];
+        with_file(&nested, |file| {
             assert!(header_extractor(0, 8, file).is_err());
             Ok(())
         })
