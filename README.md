@@ -4,6 +4,8 @@ A small Rust project for learning how media files are structured. I started it t
 
 The current focus is MP4 and MOV: reading box headers, walking nested boxes, and connecting metadata to the actual media bytes.
 
+![Media Byte Crawler exploring the bundled MP4 sample, with the file map, box hierarchy, and decoded fields.](docs/images/media-byte-crawler.png)
+
 ## Run
 
 With Rust and Cargo installed, start the interactive explorer:
